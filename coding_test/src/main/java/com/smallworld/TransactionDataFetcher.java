@@ -8,8 +8,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class TransactionDataFetcher {
     @Autowired
@@ -37,10 +39,9 @@ public class TransactionDataFetcher {
     public double getMaxTransactionAmount() {
         List<Transaction> transactions = transactionService.getAllTransaction();
         Optional<Transaction> optionalTransaction = transactions.stream().max(Comparator.comparingDouble(Transaction::getAmount));
-        if(optionalTransaction.isPresent()){
+        if (optionalTransaction.isPresent()) {
             return optionalTransaction.get().getAmount();
-        }
-        else{
+        } else {
             throw new ServiceException("Transaction Object Not Found");
         }
     }
@@ -49,7 +50,8 @@ public class TransactionDataFetcher {
      * Counts the number of unique clients that sent or received a transaction
      */
     public long countUniqueClients() {
-        throw new UnsupportedOperationException();
+        List<Transaction> transactions = transactionService.getAllTransaction();
+        return transactions.stream().map(Transaction::getSenderFullName).distinct().count();
     }
 
     /**
@@ -57,42 +59,51 @@ public class TransactionDataFetcher {
      * issue that has not been solved
      */
     public boolean hasOpenComplianceIssues(String clientFullName) {
-        throw new UnsupportedOperationException();
+        List<Transaction> transactions = transactionService.getAllTransaction();
+        return transactions.stream().anyMatch(transaction -> transaction.getSenderFullName().equals(clientFullName)
+                && Objects.nonNull(transaction.getIssueId()) && transaction.getIssueSolved().equals(false));
+
     }
 
     /**
      * Returns all transactions indexed by beneficiary name
      */
     public Map<String, Object> getTransactionsByBeneficiaryName() {
-        throw new UnsupportedOperationException();
+        List<Transaction> transactions = transactionService.getAllTransaction();
+        return transactions.stream().collect(Collectors.toMap(Transaction::getBeneficiaryFullName, transaction -> transaction));
     }
 
     /**
      * Returns the identifiers of all open compliance issues
      */
     public Set<Integer> getUnsolvedIssueIds() {
-        throw new UnsupportedOperationException();
+        List<Transaction> transactions = transactionService.getAllTransaction();
+        return transactions.stream().filter(transaction -> transaction.getIssueSolved().equals(false)).map(Transaction::getMtn).collect(Collectors.toSet());
     }
 
     /**
      * Returns a list of all solved issue messages
      */
     public List<String> getAllSolvedIssueMessages() {
-        throw new UnsupportedOperationException();
+
+        List<Transaction> transactions = transactionService.getAllTransaction();
+        return transactions.stream().filter(transaction -> transaction.getIssueSolved().equals(true)).map(Transaction::getIssueMessage).toList();
     }
 
     /**
      * Returns the 3 transactions with highest amount sorted by amount descending
      */
     public List<Object> getTop3TransactionsByAmount() {
-        throw new UnsupportedOperationException();
+        List<Transaction> transactions = transactionService.getAllTransaction();
+        return transactions.stream().sorted(Comparator.comparing(Transaction::getAmount).reversed()).limit(3).collect(Collectors.toList());
     }
 
     /**
      * Returns the sender with the most total sent amount
      */
-    public Optional<Object> getTopSender() {
-        throw new UnsupportedOperationException();
-    }
+//    public Optional<Object> getTopSender() {
+//        List<Transaction> transactions = transactionService.getAllTransaction();
+//        return transactions.stream().max(Comparator.comparingDouble(Transaction::getAmount));
+//    }
 
 }

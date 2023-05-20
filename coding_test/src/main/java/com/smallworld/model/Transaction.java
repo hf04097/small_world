@@ -7,7 +7,7 @@ import lombok.Setter;
 @Setter
 public class Transaction {
 
-    private Long mtn;
+    private Integer mtn;
     private Double amount;
     private String senderFullName;
     private Integer senderAge;
