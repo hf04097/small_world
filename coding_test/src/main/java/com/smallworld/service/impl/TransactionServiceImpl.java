@@ -2,6 +2,7 @@ package com.smallworld.service.impl;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smallworld.exception.ServiceException;
 import com.smallworld.model.Transaction;
 import com.smallworld.service.TransactionService;
 import jakarta.annotation.PostConstruct;
@@ -29,11 +30,11 @@ public class TransactionServiceImpl implements TransactionService {
     private void getAllTransactions() {
         ObjectMapper mapper = new ObjectMapper();
         try {
-            File initialFile = new File("src/main/java/resources/transactions.json");
+            File initialFile = new File("src/main/resources/transactions.json");
             transactions = mapper.readValue(initialFile, new TypeReference<List<Transaction>>() {
             });
         } catch (Exception e) {
-            log.error("Unable to load transaction: " + e.getMessage());
+            throw new ServiceException("Transaction Object Not Found");
         }
     }
 }

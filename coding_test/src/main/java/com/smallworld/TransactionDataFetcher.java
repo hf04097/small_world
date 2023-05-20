@@ -1,31 +1,48 @@
 package com.smallworld;
 
+import com.smallworld.exception.ServiceException;
+import com.smallworld.model.Transaction;
+import com.smallworld.service.TransactionService;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 public class TransactionDataFetcher {
+    @Autowired
+    private TransactionService transactionService;
 
     /**
      * Returns the sum of the amounts of all transactions
      */
     public double getTotalTransactionAmount() {
-        throw new UnsupportedOperationException();
+        List<Transaction> transactions = transactionService.getAllTransaction();
+        return transactions.stream().mapToDouble(Transaction::getAmount).sum();
     }
 
     /**
      * Returns the sum of the amounts of all transactions sent by the specified client
      */
     public double getTotalTransactionAmountSentBy(String senderFullName) {
-        throw new UnsupportedOperationException();
+        List<Transaction> transactions = transactionService.getAllTransaction();
+        return transactions.stream().filter(transaction -> transaction.getSenderFullName().equals(senderFullName)).mapToDouble(Transaction::getAmount).sum();
     }
 
     /**
      * Returns the highest transaction amount
      */
     public double getMaxTransactionAmount() {
-        throw new UnsupportedOperationException();
+        List<Transaction> transactions = transactionService.getAllTransaction();
+        Optional<Transaction> optionalTransaction = transactions.stream().max(Comparator.comparingDouble(Transaction::getAmount));
+        if(optionalTransaction.isPresent()){
+            return optionalTransaction.get().getAmount();
+        }
+        else{
+            throw new ServiceException("Transaction Object Not Found");
+        }
     }
 
     /**
