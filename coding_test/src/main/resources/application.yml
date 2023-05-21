@@ -1,2 +1,6 @@
 server:
   port: 8085
+
+datasource:
+  json:
+    file-location: ${JSON_FILE_LOCATION:src/main/resources/transactions.json}
