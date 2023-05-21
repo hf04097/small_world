@@ -4,8 +4,10 @@ import com.smallworld.exception.ServiceException;
 import com.smallworld.model.Transaction;
 import com.smallworld.service.TransactionService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.CollectionUtils;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -22,6 +24,9 @@ public class TransactionDataFetcher {
      */
     public double getTotalTransactionAmount() {
         List<Transaction> transactions = transactionService.getAllTransaction();
+        if (CollectionUtils.isEmpty(transactions)) {
+            return 0.0;
+        }
         return transactions.stream().mapToDouble(Transaction::getAmount).sum();
     }
 
@@ -30,6 +35,9 @@ public class TransactionDataFetcher {
      */
     public double getTotalTransactionAmountSentBy(String senderFullName) {
         List<Transaction> transactions = transactionService.getAllTransaction();
+        if (CollectionUtils.isEmpty(transactions)) {
+            return 0.0;
+        }
         return transactions.stream().filter(transaction -> transaction.getSenderFullName().equals(senderFullName)).mapToDouble(Transaction::getAmount).sum();
     }
 
@@ -38,6 +46,9 @@ public class TransactionDataFetcher {
      */
     public double getMaxTransactionAmount() {
         List<Transaction> transactions = transactionService.getAllTransaction();
+        if (CollectionUtils.isEmpty(transactions)) {
+            return 0.0;
+        }
         Optional<Transaction> optionalTransaction = transactions.stream().max(Comparator.comparingDouble(Transaction::getAmount));
         if (optionalTransaction.isPresent()) {
             return optionalTransaction.get().getAmount();
@@ -50,7 +61,11 @@ public class TransactionDataFetcher {
      * Counts the number of unique clients that sent or received a transaction
      */
     public long countUniqueClients() {
+        //todo: is this correct?
         List<Transaction> transactions = transactionService.getAllTransaction();
+        if (CollectionUtils.isEmpty(transactions)) {
+            return 0;
+        }
         return transactions.stream().map(Transaction::getSenderFullName).distinct().count();
     }
 
@@ -70,7 +85,8 @@ public class TransactionDataFetcher {
      */
     public Map<String, Object> getTransactionsByBeneficiaryName() {
         List<Transaction> transactions = transactionService.getAllTransaction();
-        return transactions.stream().collect(Collectors.toMap(Transaction::getBeneficiaryFullName, transaction -> transaction));
+        Map<String, List<Transaction>> beneficiaryMap = transactions.stream().collect(Collectors.groupingBy(Transaction::getBeneficiaryFullName));
+        return new HashMap<>(beneficiaryMap);
     }
 
     /**
@@ -78,7 +94,7 @@ public class TransactionDataFetcher {
      */
     public Set<Integer> getUnsolvedIssueIds() {
         List<Transaction> transactions = transactionService.getAllTransaction();
-        return transactions.stream().filter(transaction -> transaction.getIssueSolved().equals(false)).map(Transaction::getMtn).collect(Collectors.toSet());
+        return transactions.stream().filter(transaction -> transaction.getIssueSolved().equals(false)).map(Transaction::getIssueId).collect(Collectors.toSet());
     }
 
     /**
@@ -101,9 +117,14 @@ public class TransactionDataFetcher {
     /**
      * Returns the sender with the most total sent amount
      */
-//    public Optional<Object> getTopSender() {
-//        List<Transaction> transactions = transactionService.getAllTransaction();
-//        return transactions.stream().max(Comparator.comparingDouble(Transaction::getAmount));
-//    }
+    public Optional<Object> getTopSender() {
+        List<Transaction> transactions = transactionService.getAllTransaction();
+        Optional<Transaction> optionalTransaction = transactions.stream().max(Comparator.comparingDouble(Transaction::getAmount));
+        if (optionalTransaction.isPresent()) {
+            return Optional.ofNullable(optionalTransaction.get().getSenderFullName());
+        } else {
+            throw new ServiceException("Transaction object not found");
+        }
+    }
 
 }
