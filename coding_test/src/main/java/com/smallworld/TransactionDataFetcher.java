@@ -6,13 +6,19 @@ import com.smallworld.service.TransactionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.CollectionUtils;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 public class TransactionDataFetcher {
@@ -61,12 +67,13 @@ public class TransactionDataFetcher {
      * Counts the number of unique clients that sent or received a transaction
      */
     public long countUniqueClients() {
-        //todo: is this correct?
         List<Transaction> transactions = transactionService.getAllTransaction();
         if (CollectionUtils.isEmpty(transactions)) {
             return 0;
         }
-        return transactions.stream().map(Transaction::getSenderFullName).distinct().count();
+        long senderCount = transactions.stream().map(Transaction::getSenderFullName).distinct().count();
+        long receiverCount = transactions.stream().map(Transaction::getSenderFullName).distinct().count();
+        return senderCount + receiverCount;
     }
 
     /**
@@ -75,9 +82,12 @@ public class TransactionDataFetcher {
      */
     public boolean hasOpenComplianceIssues(String clientFullName) {
         List<Transaction> transactions = transactionService.getAllTransaction();
-        return transactions.stream().anyMatch(transaction -> transaction.getSenderFullName().equals(clientFullName)
-                && Objects.nonNull(transaction.getIssueId()) && transaction.getIssueSolved().equals(false));
-
+        if (CollectionUtils.isEmpty(transactions)) {
+            return false;
+        }
+        // not checking issue id too as if issue contain no issues then IssueSolved is true
+        return transactions.stream().anyMatch(transaction -> (transaction.getSenderFullName().equals(clientFullName) ||
+                transaction.getBeneficiaryFullName().equals(clientFullName)) && transaction.getIssueSolved().equals(false));
     }
 
     /**
@@ -85,7 +95,13 @@ public class TransactionDataFetcher {
      */
     public Map<String, Object> getTransactionsByBeneficiaryName() {
         List<Transaction> transactions = transactionService.getAllTransaction();
+        if (CollectionUtils.isEmpty(transactions)) {
+            return Collections.emptyMap();
+        }
+
         Map<String, List<Transaction>> beneficiaryMap = transactions.stream().collect(Collectors.groupingBy(Transaction::getBeneficiaryFullName));
+
+        //changing value to required object type from List<Transaction>
         return new HashMap<>(beneficiaryMap);
     }
 
@@ -94,6 +110,9 @@ public class TransactionDataFetcher {
      */
     public Set<Integer> getUnsolvedIssueIds() {
         List<Transaction> transactions = transactionService.getAllTransaction();
+        if (CollectionUtils.isEmpty(transactions)) {
+            return new HashSet<>();
+        }
         return transactions.stream().filter(transaction -> transaction.getIssueSolved().equals(false)).map(Transaction::getIssueId).collect(Collectors.toSet());
     }
 
@@ -101,9 +120,14 @@ public class TransactionDataFetcher {
      * Returns a list of all solved issue messages
      */
     public List<String> getAllSolvedIssueMessages() {
-
         List<Transaction> transactions = transactionService.getAllTransaction();
-        return transactions.stream().filter(transaction -> transaction.getIssueSolved().equals(true)).map(Transaction::getIssueMessage).toList();
+        if (CollectionUtils.isEmpty(transactions)) {
+            return new ArrayList<>();
+        }
+
+        // checking issue id too as if issue contain no issues then IssueSolved is true
+        return transactions.stream().filter(transaction -> Objects.nonNull(transaction.getIssueId()) &&
+                transaction.getIssueSolved().equals(true)).map(Transaction::getIssueMessage).toList();
     }
 
     /**
@@ -111,7 +135,13 @@ public class TransactionDataFetcher {
      */
     public List<Object> getTop3TransactionsByAmount() {
         List<Transaction> transactions = transactionService.getAllTransaction();
-        return transactions.stream().sorted(Comparator.comparing(Transaction::getAmount).reversed()).limit(3).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(transactions)) {
+            return new ArrayList<>();
+        }
+
+        //finding unique transactions as transaction can due to list of issues
+        List<Transaction> uniqueTransaction = transactions.stream().filter(distinctByKey(Transaction::getMtn)).toList();
+        return uniqueTransaction.stream().sorted(Comparator.comparing(Transaction::getAmount).reversed()).limit(3).collect(Collectors.toList());
     }
 
     /**
@@ -119,12 +149,19 @@ public class TransactionDataFetcher {
      */
     public Optional<Object> getTopSender() {
         List<Transaction> transactions = transactionService.getAllTransaction();
-        Optional<Transaction> optionalTransaction = transactions.stream().max(Comparator.comparingDouble(Transaction::getAmount));
-        if (optionalTransaction.isPresent()) {
-            return Optional.ofNullable(optionalTransaction.get().getSenderFullName());
-        } else {
+        if (CollectionUtils.isEmpty(transactions)) {
             throw new ServiceException("Transaction object not found");
         }
+
+        //grouping by sender and using sum as aggregate function. Then from that result finding the sender with max sum
+        Map<String, Double> senderWithTotalAmountMap = transactions.stream().collect(Collectors.groupingBy(Transaction::getSenderFullName,
+                Collectors.summingDouble(Transaction::getAmount)));
+        return Optional.ofNullable(Collections.max(senderWithTotalAmountMap.entrySet(), Map.Entry.comparingByValue()).getKey());
+    }
+
+    private static <T> Predicate<T> distinctByKey(Function<? super T, ?> keyExtractor) {
+        Set<Object> seen = ConcurrentHashMap.newKeySet();
+        return t -> seen.add(keyExtractor.apply(t));
     }
 
 }

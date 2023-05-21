@@ -18,6 +18,7 @@ public class TransactionServiceImpl implements TransactionService {
     private static List<Transaction> transactions;
 
     @PostConstruct
+    // Loading json file one and storing it in static variable
     void initTransaction() {
         getAllTransactions();
     }
@@ -30,7 +31,9 @@ public class TransactionServiceImpl implements TransactionService {
     private void getAllTransactions() {
         ObjectMapper mapper = new ObjectMapper();
         try {
-            File initialFile = new File("src/main/resources/transactions.json");
+            log.info("loading file");
+            String filename = "src/main/resources/transactions.json";
+            File initialFile = new File(filename);
             transactions = mapper.readValue(initialFile, new TypeReference<List<Transaction>>() {
             });
         } catch (Exception e) {
